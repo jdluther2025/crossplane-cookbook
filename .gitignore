@@ -1,0 +1,12 @@
+# CDK
+foundations/eks-base/infra/.venv/
+foundations/eks-base/infra/cdk.out/
+foundations/eks-base/infra/__pycache__/
+foundations/eks-base/infra/eks_base/__pycache__/
+foundations/eks-base/infra/*.egg-info/
+
+# eksctl — generated from template, contains real subnet/VPC IDs
+foundations/eks-base/cluster/cluster.yaml
+
+# macOS
+.DS_Store

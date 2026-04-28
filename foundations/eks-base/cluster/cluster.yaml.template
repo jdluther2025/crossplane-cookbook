@@ -1,0 +1,33 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: ${EKS_CLUSTER_NAME}
+  region: ${AWS_REGION}
+  version: "${K8S_VERSION}"
+
+# VPC provisioned by CDK (infra/).
+# scripts/create-cluster.sh populates these values from CDK outputs.
+vpc:
+  id: "${VPC_ID}"
+  subnets:
+    private:
+      ${AZ_1}: { id: "${PRIVATE_SUBNET_1}" }
+      ${AZ_2}: { id: "${PRIVATE_SUBNET_2}" }
+    public:
+      ${AZ_1}: { id: "${PUBLIC_SUBNET_1}" }
+      ${AZ_2}: { id: "${PUBLIC_SUBNET_2}" }
+
+iam:
+  withOIDC: true
+
+managedNodeGroups:
+  - name: system
+    instanceType: t3.medium
+    minSize: 1
+    desiredCapacity: 2
+    maxSize: 3
+    labels:
+      role: system
+    tags:
+      Project: crossplane-cookbook
