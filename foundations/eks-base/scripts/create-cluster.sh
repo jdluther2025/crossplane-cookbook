@@ -40,6 +40,7 @@ export EKS_DEFAULT_MNG_MAX="${EKS_DEFAULT_MNG_MAX:-3}"
 export EKS_DEFAULT_MNG_DESIRED="${EKS_DEFAULT_MNG_DESIRED:-2}"
 CROSSPLANE_VERSION="${CROSSPLANE_VERSION:-2.2.0}"
 PROVIDER_FAMILY_VERSION="${PROVIDER_FAMILY_VERSION:-v2.0.0}"
+PROVIDER_FAMILY_NAME="crossplane-contrib-provider-family-aws"
 PROVIDER_IAM_ROLE="crossplane-provider-aws"
 
 # ── Instance type selection ─────────────────────────────────────────────────
@@ -182,7 +183,7 @@ EOF
 aws iam create-role \
     --role-name "${PROVIDER_IAM_ROLE}" \
     --assume-role-policy-document "${TRUST_POLICY}" \
-    --description "Crossplane provider-aws IRSA role — crossplane-cookbook" \
+    --description "Crossplane provider-aws IRSA role for crossplane-cookbook" \
     --region "${AWS_REGION}" \
     --output text --query 'Role.Arn'
 
@@ -199,9 +200,9 @@ kubectl apply -f - <<EOF
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: upbound-provider-family-aws
+  name: ${PROVIDER_FAMILY_NAME}
 spec:
-  package: xpkg.crossplane.io/upbound/provider-family-aws:${PROVIDER_FAMILY_VERSION}
+  package: xpkg.crossplane.io/crossplane-contrib/provider-family-aws:${PROVIDER_FAMILY_VERSION}
   runtimeConfigRef:
     name: aws-provider-irsa
 EOF
@@ -219,7 +220,7 @@ spec:
 EOF
 
 echo "Waiting for provider-family-aws to become healthy..."
-kubectl wait provider/upbound-provider-family-aws \
+kubectl wait provider/${PROVIDER_FAMILY_NAME} \
     --for=condition=Healthy \
     --timeout=300s
 

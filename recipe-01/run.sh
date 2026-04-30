@@ -23,7 +23,7 @@ echo ""
 echo "── STEP 1: Install provider-aws-s3 ─────────────────────────────────────"
 kubectl apply -f "${RECIPE_DIR}/provider-s3.yaml"
 echo "Waiting for provider-aws-s3 to become healthy (may take ~60s)..."
-kubectl wait provider/upbound-provider-aws-s3 \
+kubectl wait provider/crossplane-contrib-provider-aws-s3 \
     --for=condition=Healthy \
     --timeout=300s
 echo "provider-aws-s3 is healthy."
