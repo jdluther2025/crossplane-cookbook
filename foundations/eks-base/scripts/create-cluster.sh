@@ -13,6 +13,9 @@
 #   Step 7: Install provider-family-aws + apply DeploymentRuntimeConfig (IRSA)
 #   Step 8: Apply ClusterProviderConfig (source: IRSA)
 #   Step 9: Verify
+#
+# Override defaults with environment variables before running:
+#   INSTANCE_TYPE=t3.medium ./foundations/eks-base/scripts/create-cluster.sh
 
 set -euo pipefail
 
@@ -31,9 +34,34 @@ export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --output text --query 'Accou
 export AWS_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 export EKS_CLUSTER_NAME="crossplane-cookbook"
 export K8S_VERSION="${K8S_VERSION:-1.32}"
+export EKS_DEFAULT_MNG_NAME="${EKS_DEFAULT_MNG_NAME:-system}"
+export EKS_DEFAULT_MNG_MIN="${EKS_DEFAULT_MNG_MIN:-1}"
+export EKS_DEFAULT_MNG_MAX="${EKS_DEFAULT_MNG_MAX:-3}"
+export EKS_DEFAULT_MNG_DESIRED="${EKS_DEFAULT_MNG_DESIRED:-2}"
 CROSSPLANE_VERSION="${CROSSPLANE_VERSION:-2.2.0}"
 PROVIDER_FAMILY_VERSION="${PROVIDER_FAMILY_VERSION:-v2.0.0}"
 PROVIDER_IAM_ROLE="crossplane-provider-aws"
+
+# ── Instance type selection ─────────────────────────────────────────────────
+# Override with: INSTANCE_TYPE=t3.medium ./foundations/eks-base/scripts/create-cluster.sh
+
+if [[ -z "${INSTANCE_TYPE:-}" ]]; then
+    echo "── Select node instance type ───────────────────────────────────────────"
+    echo "  1) t3.medium   — 2 vCPU,  4GB   (general testing, lowest cost)"
+    echo "  2) t3.xlarge   — 4 vCPU, 16GB   (moderate workloads)"
+    echo "  3) m5.xlarge   — 4 vCPU, 16GB   (production-like, AI/ML default)"
+    echo "  4) m5.2xlarge  — 8 vCPU, 32GB   (heavier AI/ML workloads)"
+    echo ""
+    read -r -p "Choice (1-4) [default: 1]: " type_choice
+    case "${type_choice:-1}" in
+        1) INSTANCE_TYPE="t3.medium" ;;
+        2) INSTANCE_TYPE="t3.xlarge" ;;
+        3) INSTANCE_TYPE="m5.xlarge" ;;
+        4) INSTANCE_TYPE="m5.2xlarge" ;;
+        *) echo "Invalid choice. Using t3.medium."; INSTANCE_TYPE="t3.medium" ;;
+    esac
+fi
+export INSTANCE_TYPE
 
 echo ""
 echo "── STEP 1: Deploy VPC with CDK ─────────────────────────────────────────"
@@ -71,23 +99,27 @@ export AZ_2=$(aws ec2 describe-subnets --subnet-ids "${PRIVATE_SUBNET_2}" --regi
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════════╗"
-echo "║            Crossplane Cookbook — Foundation Summary                  ║"
+echo "║          Crossplane Cookbook — Foundation Summary                   ║"
 echo "╠══════════════════════════════════════════════════════════════════════╣"
-printf "║  Cluster name   : %-50s║\n" "${EKS_CLUSTER_NAME}"
-printf "║  AWS account    : %-50s║\n" "${AWS_ACCOUNT_ID}"
-printf "║  Region         : %-50s║\n" "${AWS_REGION}"
-printf "║  Kubernetes     : %-50s║\n" "${K8S_VERSION}"
-printf "║  Crossplane     : %-50s║\n" "${CROSSPLANE_VERSION}"
+echo "║  Cluster name   : ${EKS_CLUSTER_NAME}"
+echo "║  AWS account    : ${AWS_ACCOUNT_ID}"
+echo "║  Region         : ${AWS_REGION}"
+echo "║  Kubernetes     : ${K8S_VERSION}"
+echo "║  Crossplane     : ${CROSSPLANE_VERSION}"
 echo "╠══════════════════════════════════════════════════════════════════════╣"
-printf "║  VPC            : %-50s║\n" "${VPC_ID}"
-printf "║  Private subnet : %-50s║\n" "${PRIVATE_SUBNET_1} (${AZ_1})"
-printf "║  Private subnet : %-50s║\n" "${PRIVATE_SUBNET_2} (${AZ_2})"
-printf "║  Public subnet  : %-50s║\n" "${PUBLIC_SUBNET_1} (${AZ_1})"
-printf "║  Public subnet  : %-50s║\n" "${PUBLIC_SUBNET_2} (${AZ_2})"
+echo "║  VPC            : ${VPC_ID}"
+echo "║  Private subnet : ${PRIVATE_SUBNET_1} (${AZ_1})"
+echo "║  Private subnet : ${PRIVATE_SUBNET_2} (${AZ_2})"
+echo "║  Public subnet  : ${PUBLIC_SUBNET_1} (${AZ_1})"
+echo "║  Public subnet  : ${PUBLIC_SUBNET_2} (${AZ_2})"
 echo "╠══════════════════════════════════════════════════════════════════════╣"
-printf "║  Node group     : %-50s║\n" "t3.medium x2 (managed)"
-printf "║  OIDC           : %-50s║\n" "enabled (required for IRSA)"
-printf "║  Provider auth  : %-50s║\n" "IRSA — no static credentials"
+echo "║  Node group     : ${EKS_DEFAULT_MNG_NAME}"
+echo "║  Instance type  : ${INSTANCE_TYPE}"
+echo "║  Min / Max      : ${EKS_DEFAULT_MNG_MIN} / ${EKS_DEFAULT_MNG_MAX}"
+echo "║  Desired nodes  : ${EKS_DEFAULT_MNG_DESIRED}"
+echo "╠══════════════════════════════════════════════════════════════════════╣"
+echo "║  OIDC / IRSA    : Enabled"
+echo "║  Provider auth  : IRSA — no static credentials                      ║"
 echo "╚══════════════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -163,9 +195,6 @@ echo "  IAM role: ${PROVIDER_ROLE_ARN}"
 
 echo ""
 echo "── STEP 7: Install provider-family-aws + DeploymentRuntimeConfig ─────────"
-# provider-family-aws creates the shared ServiceAccount that all sub-providers use.
-# DeploymentRuntimeConfig annotates that SA with the IRSA role ARN.
-
 kubectl apply -f - <<EOF
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
@@ -215,5 +244,5 @@ echo ""
 kubectl get providers
 echo ""
 echo "Foundation ready. Next steps:"
-echo "  → Run a recipe: cd recipe-01 && ./run.sh"
+echo "  → Run a recipe: ./recipe-01/run.sh"
 echo "  → Tear down:    ./foundations/eks-base/scripts/destroy-cluster.sh"

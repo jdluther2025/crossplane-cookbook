@@ -22,11 +22,11 @@ iam:
   withOIDC: true
 
 managedNodeGroups:
-  - name: system
-    instanceType: t3.medium
-    minSize: 1
-    desiredCapacity: 2
-    maxSize: 3
+  - name: ${EKS_DEFAULT_MNG_NAME}
+    instanceType: ${INSTANCE_TYPE}
+    minSize: ${EKS_DEFAULT_MNG_MIN}
+    desiredCapacity: ${EKS_DEFAULT_MNG_DESIRED}
+    maxSize: ${EKS_DEFAULT_MNG_MAX}
     labels:
       role: system
     tags:
