@@ -60,23 +60,4 @@ echo ""
 echo "Console: https://s3.console.aws.amazon.com/s3/buckets/${BUCKET_NAME}"
 
 echo ""
-echo "── STEP 5: Delete demonstration ─────────────────────────────────────────"
-echo "This is the aha moment: deleting the K8s resource deletes the S3 bucket."
-read -r -p "Delete the bucket now? (y/n): " confirm
-if [[ "${confirm}" == "y" ]]; then
-    envsubst < "${RECIPE_DIR}/bucket.yaml" | kubectl delete -f -
-    echo "Waiting for deletion propagation to AWS..."
-    kubectl wait "${BUCKET_RESOURCE}/${BUCKET_NAME}" \
-        --namespace "${NAMESPACE}" \
-        --for=delete \
-        --timeout=120s 2>/dev/null || true
-    echo ""
-    aws s3api head-bucket --bucket "${BUCKET_NAME}" --region "${AWS_REGION}" 2>/dev/null \
-        && echo "⚠️  Bucket still exists in AWS — wait a moment and check again." \
-        || echo "AWS confirms: s3://${BUCKET_NAME} is gone."
-    echo ""
-    echo "Done. Bucket deleted from both Kubernetes and AWS."
-else
-    echo "Bucket left running. To delete manually:"
-    echo "  kubectl delete ${BUCKET_RESOURCE} ${BUCKET_NAME} -n ${NAMESPACE}"
-fi
+echo "Recipe #1 complete. To clean up, run: ./recipe-01/cleanup.sh"
