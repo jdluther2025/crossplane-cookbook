@@ -7,6 +7,7 @@
 #   Step 2: Delete IAM role for Crossplane provider IRSA
 #   Step 3: eksctl delete cluster
 #   Step 4: CDK destroy (VPC)
+#   Step 5: Verify everything is gone (no idle costs)
 
 set -euo pipefail
 
@@ -74,4 +75,49 @@ cdk destroy --force
 deactivate
 
 echo ""
-echo "Foundation destroyed. All resources have been removed."
+echo "── STEP 5: Verify everything is gone ────────────────────────────────────"
+PASS=0
+FAIL=0
+
+check() {
+    local label="$1"; local cmd="$2"; local expect_empty="$3"
+    local result
+    result=$(eval "${cmd}" 2>&1)
+    if [[ "${expect_empty}" == "true" && -z "${result}" ]] || \
+       [[ "${expect_empty}" == "false" && -n "$(echo "${result}" | grep -i 'does not exist\|not found\|NoSuchEntity\|cannot list\|error')" ]]; then
+        echo "  ✓ ${label}"
+        PASS=$((PASS + 1))
+    else
+        echo "  ✗ ${label} — may still exist"
+        echo "    ${result}" | head -3
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+check "EKS cluster deleted" \
+    "aws eks describe-cluster --name ${EKS_CLUSTER_NAME} --region ${AWS_REGION} 2>&1 | grep -i 'not found\|does not exist'" \
+    "false"
+
+check "eksctl CloudFormation stack deleted" \
+    "aws cloudformation describe-stacks --stack-name eksctl-${EKS_CLUSTER_NAME}-cluster --region ${AWS_REGION} 2>&1 | grep -i 'does not exist\|not found'" \
+    "false"
+
+check "CDK CloudFormation stack deleted" \
+    "aws cloudformation describe-stacks --stack-name EksBaseStack --region ${AWS_REGION} 2>&1 | grep -i 'does not exist\|not found'" \
+    "false"
+
+check "EC2 nodes terminated" \
+    "aws ec2 describe-instances \
+        --filters Name=tag:eks:cluster-name,Values=${EKS_CLUSTER_NAME} Name=instance-state-name,Values=running,pending,stopping \
+        --query 'Reservations[].Instances[].InstanceId' \
+        --output text --region ${AWS_REGION}" \
+    "true"
+
+echo ""
+if [[ "${FAIL}" -eq 0 ]]; then
+    echo "All ${PASS} checks passed. No idle costs."
+else
+    echo "${FAIL} check(s) failed — review above. Re-run checks with:"
+    echo "  aws eks describe-cluster --name ${EKS_CLUSTER_NAME} --region ${AWS_REGION}"
+    echo "  aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE --region ${AWS_REGION}"
+fi
