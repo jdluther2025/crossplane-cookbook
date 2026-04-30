@@ -197,7 +197,7 @@ kubectl wait provider/upbound-provider-family-aws \
 echo ""
 echo "── STEP 8: Apply ClusterProviderConfig (IRSA) ────────────────────────────"
 kubectl apply -f - <<EOF
-apiVersion: aws.upbound.io/v1beta1
+apiVersion: aws.m.upbound.io/v1beta1
 kind: ClusterProviderConfig
 metadata:
   name: default

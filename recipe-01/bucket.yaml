@@ -1,0 +1,10 @@
+apiVersion: s3.aws.m.upbound.io/v1beta1
+kind: Bucket
+metadata:
+  namespace: ${NAMESPACE:-default}
+  name: ${BUCKET_NAME}
+spec:
+  forProvider:
+    region: ${AWS_REGION}
+  providerConfigRef:
+    name: default
