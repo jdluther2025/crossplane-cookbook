@@ -10,11 +10,14 @@ set -euo pipefail
 RECIPE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export AWS_REGION="${AWS_REGION:-us-east-1}"
+export NAMESPACE="${NAMESPACE:-default}"
 export AWS_ACCOUNT_ID
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --output text --query 'Account')
 
 # Bucket name: globally unique by default (last 8 digits of account ID)
 export BUCKET_NAME="${BUCKET_NAME:-xp-cookbook-${AWS_ACCOUNT_ID: -8}-r01}"
+
+BUCKET_RESOURCE="buckets.s3.aws.m.upbound.io"
 
 echo ""
 echo "── STEP 1: Install provider-aws-s3 ─────────────────────────────────────"
@@ -24,17 +27,21 @@ kubectl wait provider/upbound-provider-aws-s3 \
     --for=condition=Healthy \
     --timeout=300s
 echo "provider-aws-s3 is healthy."
+echo ""
+kubectl get providers
 
 echo ""
 echo "── STEP 2: Create S3 Bucket Managed Resource ────────────────────────────"
 echo "Bucket name : ${BUCKET_NAME}"
 echo "Region      : ${AWS_REGION}"
+echo "Namespace   : ${NAMESPACE}"
 envsubst < "${RECIPE_DIR}/bucket.yaml" | kubectl apply -f -
 
 echo ""
 echo "── STEP 3: Watch Crossplane reconcile ───────────────────────────────────"
 echo "Waiting for bucket to become Ready (Crossplane is calling the S3 API)..."
-kubectl wait bucket/"${BUCKET_NAME}" \
+kubectl wait "${BUCKET_RESOURCE}/${BUCKET_NAME}" \
+    --namespace "${NAMESPACE}" \
     --for=condition=Ready \
     --timeout=120s
 echo "Bucket is Ready."
@@ -42,7 +49,9 @@ echo "Bucket is Ready."
 echo ""
 echo "── STEP 4: Verify ───────────────────────────────────────────────────────"
 echo ""
-kubectl get bucket "${BUCKET_NAME}" -o wide
+kubectl get "${BUCKET_RESOURCE}" "${BUCKET_NAME}" \
+    --namespace "${NAMESPACE}" \
+    -o wide
 echo ""
 aws s3api head-bucket --bucket "${BUCKET_NAME}" --region "${AWS_REGION}" 2>/dev/null \
     && echo "AWS confirms: s3://${BUCKET_NAME} exists." \
@@ -57,11 +66,17 @@ read -r -p "Delete the bucket now? (y/n): " confirm
 if [[ "${confirm}" == "y" ]]; then
     envsubst < "${RECIPE_DIR}/bucket.yaml" | kubectl delete -f -
     echo "Waiting for deletion propagation to AWS..."
-    kubectl wait bucket/"${BUCKET_NAME}" \
+    kubectl wait "${BUCKET_RESOURCE}/${BUCKET_NAME}" \
+        --namespace "${NAMESPACE}" \
         --for=delete \
         --timeout=120s 2>/dev/null || true
-    echo "Done. Bucket is gone from both Kubernetes and AWS."
+    echo ""
+    aws s3api head-bucket --bucket "${BUCKET_NAME}" --region "${AWS_REGION}" 2>/dev/null \
+        && echo "⚠️  Bucket still exists in AWS — wait a moment and check again." \
+        || echo "AWS confirms: s3://${BUCKET_NAME} is gone."
+    echo ""
+    echo "Done. Bucket deleted from both Kubernetes and AWS."
 else
     echo "Bucket left running. To delete manually:"
-    echo "  kubectl delete bucket ${BUCKET_NAME}"
+    echo "  kubectl delete ${BUCKET_RESOURCE} ${BUCKET_NAME} -n ${NAMESPACE}"
 fi
