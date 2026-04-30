@@ -8,3 +8,4 @@ spec:
     region: ${AWS_REGION}
   providerConfigRef:
     name: default
+    kind: ClusterProviderConfig
