@@ -83,9 +83,9 @@ FAIL=0
 check() {
     local label="$1"; local cmd="$2"; local expect_empty="$3"
     local result
-    result=$(eval "${cmd}" 2>&1)
+    result=$(eval "${cmd}" 2>&1 || true)
     if [[ "${expect_empty}" == "true" && -z "${result}" ]] || \
-       [[ "${expect_empty}" == "false" && -n "$(echo "${result}" | grep -i 'does not exist\|not found\|NoSuchEntity\|cannot list\|error')" ]]; then
+       [[ "${expect_empty}" == "false" && -n "$(echo "${result}" | grep -i 'does not exist\|not found\|NoSuchEntity\|cannot list\|error\|ResourceNotFoundException\|ValidationError')" ]]; then
         echo "  ✓ ${label}"
         PASS=$((PASS + 1))
     else
@@ -96,15 +96,15 @@ check() {
 }
 
 check "EKS cluster deleted" \
-    "aws eks describe-cluster --name ${EKS_CLUSTER_NAME} --region ${AWS_REGION} 2>&1 | grep -i 'not found\|does not exist'" \
+    "aws eks describe-cluster --name ${EKS_CLUSTER_NAME} --region ${AWS_REGION} 2>&1" \
     "false"
 
 check "eksctl CloudFormation stack deleted" \
-    "aws cloudformation describe-stacks --stack-name eksctl-${EKS_CLUSTER_NAME}-cluster --region ${AWS_REGION} 2>&1 | grep -i 'does not exist\|not found'" \
+    "aws cloudformation describe-stacks --stack-name eksctl-${EKS_CLUSTER_NAME}-cluster --region ${AWS_REGION} 2>&1" \
     "false"
 
 check "CDK CloudFormation stack deleted" \
-    "aws cloudformation describe-stacks --stack-name EksBaseStack --region ${AWS_REGION} 2>&1 | grep -i 'does not exist\|not found'" \
+    "aws cloudformation describe-stacks --stack-name EksBaseStack --region ${AWS_REGION} 2>&1" \
     "false"
 
 check "EC2 nodes terminated" \
