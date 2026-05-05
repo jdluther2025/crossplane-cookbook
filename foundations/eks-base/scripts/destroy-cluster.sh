@@ -38,7 +38,8 @@ fi
 
 echo ""
 echo "── STEP 1: Check for remaining Crossplane-managed resources ─────────────"
-MR_COUNT=$(kubectl get managed --no-headers 2>/dev/null | wc -l | tr -d ' ')
+MANAGED_OUTPUT=$(kubectl get managed --no-headers 2>/dev/null || true)
+MR_COUNT=$(echo -n "${MANAGED_OUTPUT}" | wc -l | tr -d ' ')
 if [[ "${MR_COUNT}" -gt 0 ]]; then
     echo "⚠️  Found ${MR_COUNT} managed resource(s) still active:"
     kubectl get managed --no-headers 2>/dev/null
